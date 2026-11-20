@@ -272,6 +272,21 @@ final class SettingsStore: ObservableObject {
         }
         return names
     }
+    func browserIcon(for name: String) -> NSImage {
+        let appURL = RouterCore.resolveApp(name, fallback: RouterCore.defaultSafari)
+        let img = NSWorkspace.shared.icon(forFile: appURL.path)
+        img.size = NSSize(width: 18, height: 18)
+        return img
+    }
+
+    func currentDefaultBrowserIcon() -> NSImage {
+        if let url = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!) {
+            let img = NSWorkspace.shared.icon(forFile: url.path)
+            img.size = NSSize(width: 16, height: 16)
+            return img
+        }
+        return browserIcon(for: "Safari")
+    }
 }
 
 struct SettingsView: View {
@@ -279,94 +294,139 @@ struct SettingsView: View {
     private let statusTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
+        Group {
+            if !store.isDefault {
+                onboardingView
+            } else {
+                rulesView
+            }
+        }
+        .background(.ultraThinMaterial)
+        .onReceive(statusTimer) { _ in
+            store.refreshDefaultStatus()
+        }
+    }
+
+    private var onboardingView: some View {
+        VStack(spacing: 20) {
+            Spacer().frame(height: 8)
+
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 84, height: 84)
+                .shadow(color: .black.opacity(0.22), radius: 10, y: 5)
+
+            VStack(spacing: 6) {
+                Text("Browser Opening Router")
+                    .font(.title2.weight(.semibold))
+                Text("Set as your default web browser to automatically route links to the right browser.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 6) {
+                Image(nsImage: store.currentDefaultBrowserIcon())
+                    .resizable()
+                    .frame(width: 16, height: 16)
+                Text("Currently using \(store.currentDefaultName)")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(.quaternary.opacity(0.7)))
+
+            VStack(spacing: 10) {
+                Button {
+                    store.setAsDefaultBrowser()
+                } label: {
+                    Text("Set as Default Browser")
+                        .frame(maxWidth: 220)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+
+                Button("Open System Settings") {
+                    store.openDefaultBrowserSettings()
+                }
+                .buttonStyle(.link)
+                .font(.caption)
+            }
+            .padding(.top, 4)
+
+            Text("System Settings → Desktop & Dock → Default web browser")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 32)
+        .padding(.bottom, 28)
+        .padding(.top, 16)
+        .frame(width: 400)
+    }
+
+    private var rulesView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    Image(systemName: store.isDefault ? "checkmark.circle.fill" : "safari.fill")
-                        .font(.title2)
-                        .foregroundStyle(store.isDefault ? .green : .accentColor)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(store.isDefault
-                             ? "Browser Opening Router is Active"
-                             : "Step 1: Set as Your Default Web Browser")
-                            .font(.headline)
-                        Text(store.isDefault
-                             ? "Links from other apps are routed automatically."
-                             : "Currently \(store.currentDefaultName). Click below, then confirm in the macOS prompt.")
+            HStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 32, height: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Browser Opening Router")
+                        .font(.headline)
+                    HStack(spacing: 5) {
+                        Circle().fill(.green).frame(width: 7, height: 7)
+                        Text("Active as Default Browser")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
                 }
-
-                if store.isDefault {
-                    HStack {
-                        Text("Need to switch back later?")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Open System Settings") {
-                            store.openDefaultBrowserSettings()
-                        }
-                        .controlSize(.small)
-                    }
-                } else {
-                    HStack(spacing: 8) {
-                        Button("Set as Default Browser") {
-                            store.setAsDefaultBrowser()
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        Button("Open System Settings") {
-                            store.openDefaultBrowserSettings()
-                        }
-
-                        Spacer()
-                    }
-                    Text("Or in System Settings → Desktop & Dock → Default web browser → Browser Opening Router")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.6)))
-            .onReceive(statusTimer) { _ in
-                store.refreshDefaultStatus()
-            }
-
-            HStack {
-                Text("Default Browser")
-                    .font(.headline)
                 Spacer()
-                Picker("", selection: $store.defaultBrowser) {
-                    ForEach(store.browserNames(including: store.defaultBrowser), id: \.self) { name in
-                        Text(name).tag(name)
-                    }
+                Button("System Settings") {
+                    store.openDefaultBrowserSettings()
                 }
-                .labelsHidden()
-                .frame(width: 200)
-                .onChange(of: store.defaultBrowser) { _ in store.save() }
+                .controlSize(.small)
             }
+            .padding(.top, 8)
 
-            Divider()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Default Browser")
+                        .font(.callout.weight(.medium))
+                    Spacer()
+                    Image(nsImage: store.browserIcon(for: store.defaultBrowser))
+                        .resizable()
+                        .frame(width: 18, height: 18)
+                    Picker("", selection: $store.defaultBrowser) {
+                        ForEach(store.browserNames(including: store.defaultBrowser), id: \.self) { name in
+                            Text(name).tag(name)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 170)
+                    .onChange(of: store.defaultBrowser) { _ in store.save() }
+                }
+                .padding(12)
+            }
+            .background(RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.45)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary, lineWidth: 1))
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Routing Rules")
-                        .font(.headline)
-                    Text("(comma-separated domains or URL prefixes)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.callout.weight(.semibold))
                     Spacer()
                     Button {
                         store.addRule()
                     } label: {
                         Label("Add Rule", systemImage: "plus")
                     }
+                    .controlSize(.small)
                 }
 
                 if store.rules.isEmpty {
-                    Text("No rules yet. Click “Add Rule” to route specific sites to another browser.")
+                    Text("No rules yet. Click “Add Rule” to route specific domains to another browser.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -381,7 +441,12 @@ struct SettingsView: View {
                                         .onChange(of: rule.patterns) { _ in store.save() }
 
                                     Image(systemName: "arrow.right")
-                                        .foregroundStyle(.secondary)
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+
+                                    Image(nsImage: store.browserIcon(for: rule.browser))
+                                        .resizable()
+                                        .frame(width: 18, height: 18)
 
                                     Picker("", selection: $rule.browser) {
                                         ForEach(store.browserNames(including: rule.browser), id: \.self) { name in
@@ -389,58 +454,45 @@ struct SettingsView: View {
                                         }
                                     }
                                     .labelsHidden()
-                                    .frame(width: 150)
+                                    .frame(width: 140)
                                     .onChange(of: rule.browser) { _ in store.save() }
 
                                     Button {
                                         store.removeRule(id: rule.id)
                                     } label: {
-                                        Image(systemName: "trash")
-                                            .foregroundStyle(.secondary)
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(.tertiary)
                                     }
-                                    .buttonStyle(.borderless)
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }
                     }
-                    .frame(minHeight: 80, maxHeight: 180)
+                    .frame(minHeight: 72, maxHeight: 190)
                 }
             }
-
-            Divider()
-
-            HStack(spacing: 8) {
-                TextField("Test URL (e.g. https://chatgpt.com)", text: $store.testURL)
-                    .textFieldStyle(.roundedBorder)
-                if let predicted = store.predictedBrowserName() {
-                    Text("→ \(predicted)")
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Button("Test Open") {
-                    store.testOpen()
-                }
-            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.45)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary, lineWidth: 1))
 
             HStack {
                 Button("Open JSON") {
                     store.openConfigFile()
                 }
-                Spacer()
-                Text("Auto-saved • 0 MB RAM when closed")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .controlSize(.small)
                 Spacer()
                 Button("Done") {
                     store.save()
                     NSApp.terminate(nil)
                 }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
-        .frame(width: 560)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 18)
+        .padding(.top, 16)
+        .frame(width: 520)
     }
 }
 
@@ -500,7 +552,10 @@ final class RouterDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let hosting = NSHostingController(rootView: SettingsView(store: settingsStore))
         let win = NSWindow(contentViewController: hosting)
         win.title = "Browser Opening Router"
-        win.styleMask = [.titled, .closable]
+        win.titleVisibility = .hidden
+        win.titlebarAppearsTransparent = true
+        win.styleMask = [.titled, .closable, .fullSizeContentView]
+        win.isMovableByWindowBackground = true
         win.isReleasedWhenClosed = false
         win.delegate = self
         win.center()

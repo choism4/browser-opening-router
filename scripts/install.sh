@@ -16,7 +16,11 @@ cleanup() { rm -rf "${STAGE}"; }
 trap cleanup EXIT
 
 BUNDLE="${STAGE}/${APP_NAME}.app"
-mkdir -p "${BUNDLE}/Contents/MacOS"
+mkdir -p "${BUNDLE}/Contents/MacOS" "${BUNDLE}/Contents/Resources"
+
+if [ -f "${REPO_ROOT}/Resources/AppIcon.icns" ]; then
+  cp "${REPO_ROOT}/Resources/AppIcon.icns" "${BUNDLE}/Contents/Resources/AppIcon.icns"
+fi
 
 /usr/bin/swiftc -O -target "${TARGET}" -framework AppKit -framework SwiftUI \
   "${REPO_ROOT}/Sources/main.swift" \
@@ -33,6 +37,8 @@ cat > "${BUNDLE}/Contents/Info.plist" <<PLIST
     <string>${DISPLAY_NAME}</string>
     <key>CFBundleExecutable</key>
     <string>${APP_NAME}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
     <key>CFBundleInfoDictionaryVersion</key>
