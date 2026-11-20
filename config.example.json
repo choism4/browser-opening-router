@@ -1,0 +1,19 @@
+{
+  "default_browser": "Safari",
+  "rules": [
+    {
+      "browser": "Firefox",
+      "domains": [
+        "claude.ai",
+        "claude.com",
+        "anthropic.com"
+      ]
+    },
+    {
+      "browser": "Google Chrome",
+      "url_prefixes": [
+        "https://meet.google.com/"
+      ]
+    }
+  ]
+}
