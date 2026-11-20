@@ -23,9 +23,16 @@ cd browser-opening-router
 
 This compiles `Sources/main.swift`, ad-hoc signs the bundle, installs `/Applications/BrowserOpeningRouter.app`, and registers it with LaunchServices.
 
-## Configure
+## Configure & Set as Default Browser
 
-Create `~/.config/browser-opening-router/config.json` (see [config.example.json](config.example.json)):
+Open **Browser Opening Router** from `/Applications` (or Spotlight):
+
+1. Click **Set as Default** to switch macOS's default web browser in one click.
+2. Pick your **Default Browser** from the auto-detected list of installed browsers.
+3. Click **+ Add Rule**, type comma-separated domains or URL prefixes (e.g. `claude.ai, claude.com`), and pick the target browser.
+4. Test any URL right inside the window with **Test Open** — changes auto-save to `~/.config/browser-opening-router/config.json`, and closing the window exits completely (0 MB idle RAM).
+
+You can also edit `~/.config/browser-opening-router/config.json` directly (see [config.example.json](config.example.json)):
 
 ```json
 {

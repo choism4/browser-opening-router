@@ -18,7 +18,7 @@ trap cleanup EXIT
 BUNDLE="${STAGE}/${APP_NAME}.app"
 mkdir -p "${BUNDLE}/Contents/MacOS"
 
-/usr/bin/swiftc -O -target "${TARGET}" -framework AppKit \
+/usr/bin/swiftc -O -target "${TARGET}" -framework AppKit -framework SwiftUI \
   "${REPO_ROOT}/Sources/main.swift" \
   -o "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 
