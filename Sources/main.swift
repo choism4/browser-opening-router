@@ -273,7 +273,7 @@ final class SettingsStore: ObservableObject {
         return names
     }
     func browserIcon(for name: String) -> NSImage {
-        let appURL = RouterCore.resolveApp(name, fallback: RouterCore.defaultSafari)
+        let appURL = RouterCore.resolveApp(name, fallback: RouterCore.defaultSafari).resolvingSymlinksInPath()
         let img = NSWorkspace.shared.icon(forFile: appURL.path)
         img.size = NSSize(width: 18, height: 18)
         return img
@@ -281,7 +281,7 @@ final class SettingsStore: ObservableObject {
 
     func currentDefaultBrowserIcon() -> NSImage {
         if let url = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!) {
-            let img = NSWorkspace.shared.icon(forFile: url.path)
+            let img = NSWorkspace.shared.icon(forFile: url.resolvingSymlinksInPath().path)
             img.size = NSSize(width: 16, height: 16)
             return img
         }
@@ -437,7 +437,11 @@ struct SettingsView: View {
                             ForEach($store.rules) { $rule in
                                 HStack(spacing: 8) {
                                     TextField("e.g. claude.ai, claude.com", text: $rule.patterns)
-                                        .textFieldStyle(.roundedBorder)
+                                        .textFieldStyle(.plain)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(RoundedRectangle(cornerRadius: 6).fill(.background.opacity(0.65)))
+                                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary, lineWidth: 1))
                                         .onChange(of: rule.patterns) { _ in store.save() }
 
                                     Image(systemName: "arrow.right")
@@ -467,6 +471,7 @@ struct SettingsView: View {
                                 }
                             }
                         }
+                        .padding(2)
                     }
                     .frame(minHeight: 72, maxHeight: 190)
                 }
@@ -561,6 +566,9 @@ final class RouterDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         win.center()
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            win.makeFirstResponder(nil)
+        }
         self.window = win
     }
 
