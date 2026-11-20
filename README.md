@@ -51,13 +51,19 @@ Create `~/.config/browser-opening-router/config.json` (see [config.example.json]
 
 ## Set as Default Browser
 
-1. Open **System Settings → Desktop & Dock → Default web browser**.
-2. Select **Browser Opening Router**.
-3. Test from Terminal:
-   ```sh
-   open https://claude.com
-   open https://example.com
-   ```
+Launch **Browser Opening Router** from `/Applications` (or Spotlight) to open the built-in setup dialog:
+
+- Click **Set as Default Browser** to trigger the macOS confirmation prompt.
+- Click **Create & Open Config** / **Open Config** to edit `~/.config/browser-opening-router/config.json`.
+
+You can also change it manually in **System Settings → Desktop & Dock → Default web browser**.
+
+Test from Terminal:
+
+```sh
+open https://claude.com
+open https://example.com
+```
 
 > Note: macOS routes links opened by *other* apps (Terminal, Slack, Mail, etc.). URLs typed directly into an already-open browser's address bar stay in that browser.
 

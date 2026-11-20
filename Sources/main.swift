@@ -14,14 +14,29 @@ struct Config: Decodable {
 
 final class RouterDelegate: NSObject, NSApplicationDelegate {
     private static let defaultSafari = URL(fileURLWithPath: "/Applications/Safari.app")
+    private static let starterConfig = """
+    {
+      "default_browser": "Safari",
+      "rules": [
+        {
+          "browser": "Firefox",
+          "domains": [
+            "claude.ai",
+            "claude.com",
+            "anthropic.com"
+          ]
+        }
+      ]
+    }
+    """
 
     private var handledURLs = false
     private var pendingOpens = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             guard let self, !self.handledURLs else { return }
-            NSApp.terminate(nil)
+            self.showSetupAssistant()
         }
     }
 
@@ -53,6 +68,100 @@ final class RouterDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func showSetupAssistant() {
+        NSApp.setActivationPolicy(.accessory)
+        NSApp.activate(ignoringOtherApps: true)
+
+        let isDefault = isDefaultWebBrowser()
+        let currentDefault = NSWorkspace.shared
+            .urlForApplication(toOpen: URL(string: "https://example.com")!)?
+            .deletingPathExtension()
+            .lastPathComponent ?? "Unknown"
+        let configURL = configFileURL()
+        let configExists = FileManager.default.fileExists(atPath: configURL.path)
+        let config = loadConfig()
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Browser Opening Router"
+
+        var lines: [String] = []
+        if isDefault {
+            lines.append("Default browser: Active (Browser Opening Router)")
+        } else {
+            lines.append("Default browser: \(currentDefault) (not active yet)")
+        }
+
+        if let config {
+            let fallbackName = config.default_browser ?? "Safari"
+            let count = config.rules?.count ?? 0
+            lines.append("Fallback browser: \(fallbackName)")
+            lines.append("Routing rules: \(count)")
+        } else if configExists {
+            lines.append("Config: invalid JSON at \(configURL.path)")
+        } else {
+            lines.append("Config: not created yet (using Safari as fallback)")
+        }
+        lines.append("Config file: \(configURL.path)")
+
+        alert.informativeText = lines.joined(separator: "\n")
+
+        if !isDefault {
+            alert.addButton(withTitle: "Set as Default Browser")
+        }
+        alert.addButton(withTitle: configExists ? "Open Config" : "Create & Open Config")
+        alert.addButton(withTitle: "Close")
+
+        let response = alert.runModal()
+        if !isDefault {
+            switch response {
+            case .alertFirstButtonReturn:
+                setAsDefaultBrowser()
+                return
+            case .alertSecondButtonReturn:
+                openOrCreateConfig(at: configURL)
+            default:
+                break
+            }
+        } else if response == .alertFirstButtonReturn {
+            openOrCreateConfig(at: configURL)
+        }
+
+        NSApp.terminate(nil)
+    }
+
+    private func isDefaultWebBrowser() -> Bool {
+        guard let selfID = Bundle.main.bundleIdentifier,
+              let handlerURL = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!),
+              let handlerID = Bundle(url: handlerURL)?.bundleIdentifier else {
+            return false
+        }
+        return handlerID == selfID
+    }
+
+    private func setAsDefaultBrowser() {
+        let appURL = Bundle.main.bundleURL
+        let group = DispatchGroup()
+        for scheme in ["http", "https"] {
+            group.enter()
+            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: scheme) { _ in
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            NSApp.terminate(nil)
+        }
+    }
+
+    private func openOrCreateConfig(at url: URL) {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: url.path) {
+            try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? (Self.starterConfig + "\n").write(to: url, atomically: true, encoding: .utf8)
+        }
+        NSWorkspace.shared.open(url)
+    }
+
     private func open(_ urls: [URL], with appURL: URL) {
         guard !urls.isEmpty else { return }
         pendingOpens += 1
@@ -70,16 +179,17 @@ final class RouterDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func loadConfig() -> Config? {
+    private func configFileURL() -> URL {
         let envPath = ProcessInfo.processInfo.environment["BROWSER_OPENING_ROUTER_CONFIG"]
-        let path: URL
         if let envPath, !envPath.isEmpty {
-            path = URL(fileURLWithPath: (envPath as NSString).expandingTildeInPath)
-        } else {
-            path = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".config/browser-opening-router/config.json")
+            return URL(fileURLWithPath: (envPath as NSString).expandingTildeInPath)
         }
-        guard let data = try? Data(contentsOf: path) else { return nil }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/browser-opening-router/config.json")
+    }
+
+    private func loadConfig() -> Config? {
+        guard let data = try? Data(contentsOf: configFileURL()) else { return nil }
         return try? JSONDecoder().decode(Config.self, from: data)
     }
 
